@@ -8,6 +8,7 @@ set -euo pipefail
 BIN=$(realpath "$1"); ICON=$(realpath "$2"); DESKTOP=$(realpath "$3"); OUT=$(realpath -m "$4")
 TOOLS=$(realpath "${TOOLS:-tools}")
 ARCH=$(uname -m)
+mkdir -p "$(dirname "$OUT")"
 APPDIR=$(mktemp -d)/AppDir
 
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/512x512/apps"
