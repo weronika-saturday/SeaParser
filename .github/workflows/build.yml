@@ -1,0 +1,141 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  LAZARUS_TAG: lazarus_4_8        # https://github.com/fpc/Lazarus tags
+  CSSCONTROLS_TAG: v0.2.3         # https://github.com/pst2d/csscontrols tags
+  FPC_SOURCE_TAG: release_3_2_2   # must match fpc from Ubuntu 24.04 (3.2.2)
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.arch }} (AppImage)
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04,     arch: x86_64 }
+          - { runner: ubuntu-24.04-arm, arch: aarch64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install FPC and GTK2
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fpc libgtk2.0-dev file
+
+      - name: Cache Lazarus
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/lazarus
+            ~/csscontrols
+          key: lazarus-${{ env.LAZARUS_TAG }}-css-${{ env.CSSCONTROLS_TAG }}-linux-${{ matrix.arch }}-v1
+
+      - name: Set up Lazarus
+        run: bash ci/setup-lazarus.sh ~/lazarus "$LAZARUS_TAG" ~/csscontrols "$CSSCONTROLS_TAG" ~/.lazcfg
+
+      - name: Build
+        run: bash ci/build.sh ~/lazarus ~/.lazcfg linux "${{ matrix.arch }}" build/SeaParser
+
+      - name: Get linuxdeploy
+        run: |
+          mkdir -p tools
+          curl -fsSL -o tools/linuxdeploy-${{ matrix.arch }}.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.arch }}.AppImage
+          curl -fsSL -o tools/linuxdeploy-plugin-gtk.sh \
+            https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
+          chmod +x tools/*
+
+      - name: Make AppImage
+        run: bash ci/appimage.sh build/SeaParser logo.png ci/seaparser.desktop dist/SeaParser-${{ matrix.arch }}.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SeaParser-linux-${{ matrix.arch }}
+          path: dist/*.AppImage
+          if-no-files-found: error
+
+  windows:
+    name: Windows ${{ matrix.os }}
+    runs-on: ubuntu-24.04            # cross-compiled from Linux
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: win32, cpu: i386 }
+          - { os: win64, cpu: x86_64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install FPC
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fpc file
+
+      - name: Cache FPC cross-compiler
+        id: cross-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/fpc-cross
+          key: fpc-cross-${{ env.FPC_SOURCE_TAG }}-${{ matrix.cpu }}-${{ matrix.os }}-v1
+
+      - name: Get FPC sources
+        if: steps.cross-cache.outputs.cache-hit != 'true'
+        run: git clone -q --depth 1 --branch "$FPC_SOURCE_TAG" https://github.com/fpc/FPCSource.git ~/fpcsrc
+
+      - name: Set up FPC cross-compiler
+        run: bash ci/fpc-cross.sh "${{ matrix.cpu }}" "${{ matrix.os }}" ~/fpcsrc ~/fpc-cross
+
+      - name: Cache Lazarus
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/lazarus
+            ~/csscontrols
+          key: lazarus-${{ env.LAZARUS_TAG }}-css-${{ env.CSSCONTROLS_TAG }}-${{ matrix.os }}-v1
+
+      - name: Set up Lazarus
+        run: bash ci/setup-lazarus.sh ~/lazarus "$LAZARUS_TAG" ~/csscontrols "$CSSCONTROLS_TAG" ~/.lazcfg
+
+      - name: Build
+        run: bash ci/build.sh ~/lazarus ~/.lazcfg "${{ matrix.os }}" "${{ matrix.cpu }}" dist/SeaParser-${{ matrix.os }}.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SeaParser-${{ matrix.os }}
+          path: dist/*.exe
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          for f in *; do mv "$f" "${f/SeaParser-/SeaParser-$GITHUB_REF_NAME-}"; done
+          sha256sum -- * > SHA256SUMS.txt
+          ls -la
+          gh release create "$GITHUB_REF_NAME" ./* --repo "$GITHUB_REPOSITORY" \
+            --title "SeaParser $GITHUB_REF_NAME" --generate-notes
