@@ -42,10 +42,10 @@ jobs:
           key: lazarus-${{ env.LAZARUS_TAG }}-css-${{ env.CSSCONTROLS_TAG }}-linux-${{ matrix.arch }}-v1
 
       - name: Set up Lazarus
-        run: bash ci/setup-lazarus.sh ~/lazarus "$LAZARUS_TAG" ~/csscontrols "$CSSCONTROLS_TAG" ~/.lazcfg
+        run: bash .ci/setup-lazarus.sh ~/lazarus "$LAZARUS_TAG" ~/csscontrols "$CSSCONTROLS_TAG" ~/.lazcfg
 
       - name: Build
-        run: bash ci/build.sh ~/lazarus ~/.lazcfg linux "${{ matrix.arch }}" build/SeaParser
+        run: bash .ci/build.sh ~/lazarus ~/.lazcfg linux "${{ matrix.arch }}" build/SeaParser
 
       - name: Get linuxdeploy
         run: |
@@ -57,7 +57,7 @@ jobs:
           chmod +x tools/*
 
       - name: Make AppImage
-        run: bash ci/appimage.sh build/SeaParser logo.png ci/seaparser.desktop dist/SeaParser-${{ matrix.arch }}.AppImage
+        run: bash .ci/appimage.sh build/SeaParser logo.png .ci/seaparser.desktop dist/SeaParser-${{ matrix.arch }}.AppImage
 
       - uses: actions/upload-artifact@v4
         with:
@@ -94,7 +94,7 @@ jobs:
         run: git clone -q --depth 1 --branch "$FPC_SOURCE_TAG" https://github.com/fpc/FPCSource.git ~/fpcsrc
 
       - name: Set up FPC cross-compiler
-        run: bash ci/fpc-cross.sh "${{ matrix.cpu }}" "${{ matrix.os }}" ~/fpcsrc ~/fpc-cross
+        run: bash .ci/fpc-cross.sh "${{ matrix.cpu }}" "${{ matrix.os }}" ~/fpcsrc ~/fpc-cross
 
       - name: Cache Lazarus
         uses: actions/cache@v4
@@ -105,10 +105,10 @@ jobs:
           key: lazarus-${{ env.LAZARUS_TAG }}-css-${{ env.CSSCONTROLS_TAG }}-${{ matrix.os }}-v1
 
       - name: Set up Lazarus
-        run: bash ci/setup-lazarus.sh ~/lazarus "$LAZARUS_TAG" ~/csscontrols "$CSSCONTROLS_TAG" ~/.lazcfg
+        run: bash .ci/setup-lazarus.sh ~/lazarus "$LAZARUS_TAG" ~/csscontrols "$CSSCONTROLS_TAG" ~/.lazcfg
 
       - name: Build
-        run: bash ci/build.sh ~/lazarus ~/.lazcfg "${{ matrix.os }}" "${{ matrix.cpu }}" dist/SeaParser-${{ matrix.os }}.exe
+        run: bash .ci/build.sh ~/lazarus ~/.lazcfg "${{ matrix.os }}" "${{ matrix.cpu }}" dist/SeaParser-${{ matrix.os }}.exe
 
       - uses: actions/upload-artifact@v4
         with:
