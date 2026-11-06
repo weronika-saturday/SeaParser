@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=SeaParser
+GenericName=Source Engine Assets Parser
+Comment=Extract the list of models and materials used in a Source Engine map (.vmf)
+Exec=SeaParser
+Icon=seaparser
+Terminal=false
+Categories=Development;Utility;
+Keywords=vmf;source;hammer;models;materials;
