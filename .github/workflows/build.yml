@@ -137,5 +137,9 @@ jobs:
           for f in *; do mv "$f" "${f/SeaParser-/SeaParser-$GITHUB_REF_NAME-}"; done
           sha256sum -- * > SHA256SUMS.txt
           ls -la
-          gh release create "$GITHUB_REF_NAME" ./* --repo "$GITHUB_REPOSITORY" \
-            --title "SeaParser $GITHUB_REF_NAME" --generate-notes
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" ./* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" ./* --repo "$GITHUB_REPOSITORY" \
+              --title "SeaParser $GITHUB_REF_NAME" --generate-notes
+          fi
